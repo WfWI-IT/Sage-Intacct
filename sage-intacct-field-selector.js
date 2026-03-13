@@ -1,7 +1,7 @@
 ;(function () {
   "use strict";
 
-  var FS_VERSION = "v0.3.3";
+  var FS_VERSION = "v0.3.4";
   var PAGE_KEY = location.pathname.replace(/[^a-z0-9]/gi, "_");
   var STORAGE_KEY = "fs_hidden_" + PAGE_KEY;
   var HIDE_EMPTY_KEY = "fs_hideEmpty_" + PAGE_KEY;
@@ -49,6 +49,20 @@
     return fallback || label.substring(0, 60) + "...";
   }
 
+  function isNoiseLabel(label) {
+    if (!label || label.length < 2) return true;
+    if (/^Field \d+$/.test(label)) return true;
+    if (/^View\s*\([^)]*\).*:/.test(label) && label.length > 50) return true;
+    if (/^(All\s+[\w\s]+)\s+\1/i.test(label)) return true;
+    return false;
+  }
+
+  function cleanLabel(label, ctrl) {
+    if (!label) return label;
+    if (/^View\s*\([^)]*\)\s*:/.test(label)) return label.replace(/\s*:.*$/, "").trim() || label.substring(0, 40);
+    return label;
+  }
+
   function discoverFormFields() {
     var fields = [];
     var seenGroups = [];
@@ -86,23 +100,33 @@
       for (var i = 0; i < groups.length; i++) {
         var g = groups[i];
         if (!g || isInFsPanel(g)) continue;
+        if (g.closest && g.closest("thead")) continue;
         if (inArray(seenGroups, g)) continue;
         seenGroups.push(g);
 
         var labelEl = g.querySelector(".qxf-label") || g.querySelector("label") ||
           g.querySelector("[class*='label']") || g.querySelector(".control-label");
-        var label = trimLabel(safeText(labelEl), "Field " + fields.length);
-
+        var rawLabel = safeText(labelEl);
         var ctrl = g.querySelector(
           ".form-control, input, select, textarea, span.form-control, span.readonly, [class*='form-control']"
         );
         if (ctrl && isInFsPanel(ctrl)) ctrl = null;
 
-        // If the group contains a big select, don't let option text pollute the label.
         if (ctrl && ctrl.tagName === "SELECT" && ctrl.options && ctrl.options.length > 10) {
           var labFor = ctrl.id && g.querySelector("label[for='" + ctrl.id + "']");
-          if (labFor) label = trimLabel(safeText(labFor), label);
+          if (labFor) rawLabel = safeText(labFor);
         }
+        var label = trimLabel(rawLabel, "Field " + fields.length);
+        label = cleanLabel(label, ctrl);
+        if (!label || label === "Field " + fields.length) {
+          if (ctrl) {
+            var alt = (ctrl.getAttribute("placeholder") || ctrl.getAttribute("aria-label") || ctrl.name || "").trim();
+            if (alt) label = trimLabel(alt, null);
+          }
+          if (!label || /^Field \d+$/.test(label)) continue;
+        }
+        if (isNoiseLabel(label)) continue;
+        if ((label === "View (related records)" || label.indexOf("View (related records)") === 0) && ctrl && ctrl.tagName === "SELECT") continue;
 
         var id = (ctrl && ctrl.id) ? ctrl.id : makeVirtualId(label + "_" + fields.length);
         addField(id, label, g, !ctrl || !ctrl.id, getTabIdFor(g) || getTabIdFor(ctrl));
@@ -143,7 +167,11 @@
       }
       if (!label) label = (ctrl.getAttribute("placeholder") || ctrl.getAttribute("aria-label") || "Field " + fields.length);
       label = trimLabel(label, "Field " + fields.length);
+      label = cleanLabel(label, ctrl);
       if (label.length > MAX_LABEL_LENGTH || label.split(/\s+/).length > MAX_LABEL_WORDS) continue;
+      if (isNoiseLabel(label)) continue;
+      if ((label === "View (related records)" || label.indexOf("View (related records)") === 0) && ctrl.tagName === "SELECT") continue;
+      if (ctrl.closest && ctrl.closest("thead")) continue;
 
       var wrapper = ctrl.closest("li, tr, .form-group, [class*='formGroup'], [class*='field-group'], .field-wrapper") || ctrl.parentElement;
       if (!wrapper || wrapper === document.body || isInFsPanel(wrapper)) continue;
