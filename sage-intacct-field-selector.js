@@ -332,8 +332,8 @@
     function isEmpty(group) {
       if (!group) return false;
 
-      // Handle checkbox-only groups like "Placeholder resource".
-      var cbOnly = group.querySelector(".checkbox.one-option");
+      // Handle checkbox-only groups: .checkbox.one-option (Employee) or .checkbox (Department, etc.)
+      var cbOnly = group.querySelector(".checkbox.one-option") || group.querySelector(".checkbox");
       if (cbOnly) {
         var real = cbOnly.querySelector("input[type='checkbox']");
         if (real) return !real.checked;
@@ -518,9 +518,13 @@
           arr.forEach(addItemRow);
         });
       }
-      // Fields without a tab-pane are ignored in the list to avoid
-      // confusing "Other fields" group; on Intacct pages we care
-      // about, everything lives inside a tab-pane.
+      // Show fields that have no tab (e.g. Department, single-section pages).
+      if (byTab["__no_tab__"] && byTab["__no_tab__"].length) {
+        addHeading("Fields");
+        byTab["__no_tab__"].forEach(addItemRow);
+        renderedKeys["__no_tab__"] = true;
+      }
+      // Other tab keys (panes without nav, etc.)
       Object.keys(byTab).forEach(function (k) {
         if (k === "__no_tab__" || renderedKeys[k]) return;
         addHeading(tabLabelById[k] || k);
@@ -654,13 +658,13 @@
       fs += "function makeId(l){return 'fs_virtual_'+String(l).toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'');}\n";
       fs += "function text(e){return e?(e.innerText||e.textContent||'').trim():'';}\n";
       fs += "function hideTabNav(pid){if(!pid)return;var sel=['.nav-tabs a[href=\"#'+pid+'\"]','.nav-tabs a[data-target=\"#'+pid+'\"]','[role=\"tab\"][aria-controls=\"'+pid+'\"]'];for(var s=0;s<sel.length;s++){var a=document.querySelector(sel[s]);if(a){var li=a.closest('li');if(li)li.style.display='none';a.style.display='none';}}\n}\n";
-      fs += "function isEmptyGroup(g){if(!g)return false;var cb=g.querySelector('.checkbox.one-option');if(cb){var real=cb.querySelector('input[type=checkbox]');if(real)return !real.checked;var sp=cb.querySelector('.buttons');if(sp&&/checkmark_empty/.test(sp.className))return true;}\n";
+      fs += "function isEmptyGroup(g){if(!g)return false;var cb=g.querySelector('.checkbox.one-option')||g.querySelector('.checkbox');if(cb){var real=cb.querySelector('input[type=checkbox]');if(real)return !real.checked;var sp=cb.querySelector('.buttons');if(sp&&/checkmark_empty/.test(sp.className))return true;}\n";
       fs += "var el=g.querySelector('input:not([type=hidden]):not([type=submit]):not([type=button]),select,textarea,span.form-control,span.readonly');if(!el)return false; if(el.tagName==='INPUT'&&(el.type==='checkbox'||el.type==='radio'))return !el.checked;var v=(el.value!==undefined?el.value:(el.innerText||el.textContent||''));v=String(v||'').trim();if(/^(select|choose|none|\\-\\-?\\s*(select|choose|none))/i.test(v))return true;return v==='';}\n";
       fs += "function apply(){\n";
       fs += "hideSelector();\n";
       fs += "var gs=document.querySelectorAll('.form-group,[class*=\"formGroup\"],[class*=\"field-group\"]');\n";
       fs += "for(var i=0;i<gs.length;i++){var g=gs[i];var l=g.querySelector('.qxf-label,label,[class*=label]');var lbl=text(l);var c=g.querySelector('.form-control,input,select,textarea,span.form-control,span.readonly');var id=(c&&c.id)?c.id:makeId(lbl||'f'+i);if(HIDDEN_FIELDS[id]===true){g.style.display='none';}else if(HIDE_EMPTY&&g.classList&&g.classList.contains('form-group')&&isEmptyGroup(g)){g.style.display='none';}else{g.style.display='';}}\n";
-      fs += "var cbs=document.querySelectorAll('.checkbox.one-option');\n";
+      fs += "var cbs=document.querySelectorAll('.checkbox.one-option, .form-group .checkbox');\n";
       fs += "for(var ci=0;ci<cbs.length;ci++){var box=cbs[ci];var bl=text(box.querySelector('.qxf-label,label,[class*=label]'));if(!bl)continue;var vid=makeId(bl);if(HIDDEN_FIELDS[vid]===true){var wrap=box.closest('.form-group,.qx-rangecontainer,li,tr,fieldset,.panel,.card')||box;if(wrap)wrap.style.display='none';}}\n";
       // Tabs are not dynamically hidden in this script to avoid flakiness.
       fs += "var tbls=document.querySelectorAll('table.table,table.data-table,.table-responsive table');\n";
