@@ -1,7 +1,7 @@
 ;(function () {
   "use strict";
 
-  var FS_VERSION = "v0.3.4";
+  var FS_VERSION = "v0.3.5";
   var PAGE_KEY = location.pathname.replace(/[^a-z0-9]/gi, "_");
   var STORAGE_KEY = "fs_hidden_" + PAGE_KEY;
   var HIDE_EMPTY_KEY = "fs_hideEmpty_" + PAGE_KEY;
@@ -55,6 +55,7 @@
     if (/^Section\s*\d+$/i.test(label)) return true;
     if (/view\s*\(\s*related\s*records\s*\)/i.test(label)) return true;
     if (label.indexOf("View (related records)") >= 0) return true;
+    if ((label || "").toLowerCase().indexOf("related records") >= 0) return true;
     if (/^View\s*\([^)]*\).*:/.test(label) && label.length > 50) return true;
     if (/^(All\s+[\w\s]+)\s+\1/i.test(label)) return true;
     return false;
@@ -249,7 +250,7 @@
         safeText(t.querySelector("caption")) ||
         safeText(t.querySelector("thead th span, thead th label, thead th")) ||
         ("Table " + (items.length + 1));
-      if (isNoiseLabel(label) || label.indexOf("View (related records)") >= 0) continue;
+      if (isNoiseLabel(label)) continue;
       var id = t.id || makeVirtualId("table_" + label);
       items.push({
         id: id,
@@ -518,11 +519,18 @@
         list.appendChild(row);
       }
 
+      function hideFromList(lbl) {
+        if (!lbl || typeof lbl !== "string") return true;
+        if (isNoiseLabel(lbl)) return true;
+        if (lbl.indexOf("View (related records)") >= 0) return true;
+        if (lbl.toLowerCase().indexOf("related records") >= 0) return true;
+        return false;
+      }
       // Fields grouped by tab (never list noise: View (related records), Field N, etc.)
       var byTab = {};
       (data.fields || []).forEach(function (f) {
         if (!f || !f.label) return;
-        if (isNoiseLabel(f.label) || f.label.indexOf("View (related records)") >= 0) return;
+        if (hideFromList(f.label)) return;
         if (filterLower && f.label.toLowerCase().indexOf(filterLower) === -1) return;
         var key = f.tabId || "__no_tab__";
         if (!byTab[key]) byTab[key] = [];
@@ -532,7 +540,7 @@
       // Tables grouped by tab, shown inline with fields
       (data.tables || []).forEach(function (t) {
         if (!t || !t.label) return;
-        if (isNoiseLabel(t.label) || t.label.indexOf("View (related records)") >= 0) return;
+        if (hideFromList(t.label)) return;
         if (filterLower && t.label.toLowerCase().indexOf(filterLower) === -1) return;
         var key = t.tabId || "__no_tab__";
         if (!byTab[key]) byTab[key] = [];
