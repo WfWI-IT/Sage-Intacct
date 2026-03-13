@@ -51,7 +51,9 @@
 
   function isNoiseLabel(label) {
     if (!label || label.length < 2) return true;
-    if (/^Field \d+$/.test(label)) return true;
+    if (/^Field\s*\d+$/i.test(label)) return true;
+    if (/^Section\s*\d+$/i.test(label)) return true;
+    if (label.indexOf("View (related records)") >= 0) return true;
     if (/^View\s*\([^)]*\).*:/.test(label) && label.length > 50) return true;
     if (/^(All\s+[\w\s]+)\s+\1/i.test(label)) return true;
     return false;
@@ -118,15 +120,14 @@
         }
         var label = trimLabel(rawLabel, "Field " + fields.length);
         label = cleanLabel(label, ctrl);
-        if (!label || label === "Field " + fields.length) {
+        if (!label || /^Field\s*\d+$/i.test(label)) {
           if (ctrl) {
             var alt = (ctrl.getAttribute("placeholder") || ctrl.getAttribute("aria-label") || ctrl.name || "").trim();
-            if (alt) label = trimLabel(alt, null);
+            if (alt && !/^Field\s*\d+$/i.test(alt)) label = trimLabel(alt, null);
           }
-          if (!label || /^Field \d+$/.test(label)) continue;
+          if (!label || /^Field\s*\d+$/i.test(label)) continue;
         }
         if (isNoiseLabel(label)) continue;
-        if ((label === "View (related records)" || label.indexOf("View (related records)") === 0) && ctrl && ctrl.tagName === "SELECT") continue;
 
         var id = (ctrl && ctrl.id) ? ctrl.id : makeVirtualId(label + "_" + fields.length);
         addField(id, label, g, !ctrl || !ctrl.id, getTabIdFor(g) || getTabIdFor(ctrl));
@@ -170,7 +171,6 @@
       label = cleanLabel(label, ctrl);
       if (label.length > MAX_LABEL_LENGTH || label.split(/\s+/).length > MAX_LABEL_WORDS) continue;
       if (isNoiseLabel(label)) continue;
-      if ((label === "View (related records)" || label.indexOf("View (related records)") === 0) && ctrl.tagName === "SELECT") continue;
       if (ctrl.closest && ctrl.closest("thead")) continue;
 
       var wrapper = ctrl.closest("li, tr, .form-group, [class*='formGroup'], [class*='field-group'], .field-wrapper") || ctrl.parentElement;
@@ -272,6 +272,7 @@
       if (sec.querySelector("table")) continue;
       var label = safeText(sec.querySelector(".panel-title, .card-title, legend, h3, h4")) ||
         ("Section " + (i + 1));
+      if (/^Section\s*\d+$/i.test(label)) continue;
       var id = sec.id || makeVirtualId("section_" + label);
       items.push({ id: id, label: label, group: sec, virtual: !sec.id });
     }
