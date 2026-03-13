@@ -53,6 +53,7 @@
     if (!label || label.length < 2) return true;
     if (/^Field\s*\d+$/i.test(label)) return true;
     if (/^Section\s*\d+$/i.test(label)) return true;
+    if (/view\s*\(\s*related\s*records\s*\)/i.test(label)) return true;
     if (label.indexOf("View (related records)") >= 0) return true;
     if (/^View\s*\([^)]*\).*:/.test(label) && label.length > 50) return true;
     if (/^(All\s+[\w\s]+)\s+\1/i.test(label)) return true;
@@ -248,6 +249,7 @@
         safeText(t.querySelector("caption")) ||
         safeText(t.querySelector("thead th span, thead th label, thead th")) ||
         ("Table " + (items.length + 1));
+      if (isNoiseLabel(label) || label.indexOf("View (related records)") >= 0) continue;
       var id = t.id || makeVirtualId("table_" + label);
       items.push({
         id: id,
@@ -516,10 +518,11 @@
         list.appendChild(row);
       }
 
-      // Fields grouped by tab
+      // Fields grouped by tab (never list noise: View (related records), Field N, etc.)
       var byTab = {};
       (data.fields || []).forEach(function (f) {
         if (!f || !f.label) return;
+        if (isNoiseLabel(f.label) || f.label.indexOf("View (related records)") >= 0) return;
         if (filterLower && f.label.toLowerCase().indexOf(filterLower) === -1) return;
         var key = f.tabId || "__no_tab__";
         if (!byTab[key]) byTab[key] = [];
@@ -529,6 +532,7 @@
       // Tables grouped by tab, shown inline with fields
       (data.tables || []).forEach(function (t) {
         if (!t || !t.label) return;
+        if (isNoiseLabel(t.label) || t.label.indexOf("View (related records)") >= 0) return;
         if (filterLower && t.label.toLowerCase().indexOf(filterLower) === -1) return;
         var key = t.tabId || "__no_tab__";
         if (!byTab[key]) byTab[key] = [];
