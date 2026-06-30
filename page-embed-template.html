@@ -1,0 +1,79 @@
+<!-- =====================================================================
+     WFWI Sage Intacct - Field Manager : PER-PAGE EMBED
+     =====================================================================
+     Paste ONE of the blocks below into the page (Intacct page editor /
+     custom HTML element). The loader is identical on every page; only the
+     config differs. All behaviour lives in the hosted field-manager.js, so
+     bug fixes/improvements ship by updating that one file - never re-paste.
+
+     HOW TO SET UP A NEW PAGE
+     1. Paste BLOCK A as-is (empty config) and save the page.
+     2. Open the page and add  #fsedit  to the end of the URL, then reload.
+        The "FIELDS" tab appears on the right. Tick what to hide.
+     3. Click "Copy config" -> it copies a filled-in  window.WFWI_FS  block.
+     4. Replace the empty config in BLOCK A with the copied one, save.
+     5. Remove  #fsedit  from the URL / reload as a normal user to verify.
+     ===================================================================== -->
+
+
+<!-- ============================ BLOCK A ============================ -->
+<!-- Production embed: per-page CONFIG first, then the shared LOADER.   -->
+
+<script>
+  // ---- Per-page config (replace `hide` with output from the selector) ----
+  window.WFWI_FS = {
+    pageId: "REPLACE-WITH-PAGE-NAME",   // e.g. "ap-bill", "ar-invoice", "customer"
+    hideEmpty: false,                   // hide blank fields on read-only views
+    hide: [
+      // "field::general_information::memo",
+      // "table::tax_details",
+      // "section::audit_trail"
+    ]
+  };
+</script>
+
+<script>
+  // ---- Shared loader (same on every page; bump @version to upgrade all) ----
+  (function () {
+    // jsDelivr gives versioned, CDN-cached, integrity-friendly delivery.
+    // Pin a tag/commit for production; use @main only while testing.
+    var SRC = "https://cdn.jsdelivr.net/gh/WfWI-IT/Sage-Intacct@v0.4.0/field-manager.js";
+
+    function hasForm(d) {
+      try {
+        return !!(d && (d.querySelector(".form-group") || d.querySelector(".tab-pane") ||
+          d.querySelector("[class*='formGroup']") || d.querySelector("table.editor_grid, table.readonly_grid")));
+      } catch (e) { return false; }
+    }
+    function targetDoc() {
+      if (hasForm(document)) return document;
+      try {
+        for (var i = 0; i < window.frames.length; i++) {
+          var f = window.frames[i];
+          if (f && f.document && hasForm(f.document)) return f.document;
+        }
+      } catch (e) {}
+      return document;
+    }
+    function inject() {
+      var d = targetDoc();
+      // Carry the config into the iframe document if that's where the form is.
+      try { if (d !== document && !d.defaultView.WFWI_FS) d.defaultView.WFWI_FS = window.WFWI_FS; } catch (e) {}
+      var s = d.createElement("script");
+      s.src = SRC;                 // external src => browser can cache it
+      (d.head || d.documentElement).appendChild(s);
+    }
+    if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", inject);
+    else inject();
+  })();
+</script>
+
+
+<!-- ============================ BLOCK B ============================ -->
+<!-- OPTIONAL: edit-only entry point. If you'd rather not touch the URL,
+     paste this in the console once to turn the selector on for your
+     browser only, then reload any page that has BLOCK A:
+
+       localStorage.setItem('wfwi_fs_edit','1');   // turn selector ON
+       localStorage.removeItem('wfwi_fs_edit');     // turn it OFF
+-->
