@@ -7,7 +7,7 @@
  *   - RUNTIME    -> reads the per-page config and hides those items for
  *                   all users. No generated logic-script to paste.
  *
- * Per page you only ever paste a tiny config + this loader (see
+ * Per page you only ever paste a tiny config + the loader (see
  * page-embed-template.html). All logic lives here, so fixing a bug or
  * improving behaviour = update THIS file once; every page benefits.
  *
@@ -17,7 +17,7 @@
 ;(function () {
   "use strict";
 
-  var VERSION = "0.4.1";
+  var VERSION = "0.4.2";
 
   // ---- Config (set by the per-page embed; safe defaults if absent) ----
   var CFG = (window.WFWI_FS && typeof window.WFWI_FS === "object") ? window.WFWI_FS : {};
@@ -31,12 +31,17 @@
   // unless the config explicitly forces it.
   var HIDE_EMPTY_FORCE = CFG.hideEmptyInEditMode === true;
 
-  // EDIT mode is triggered ONLY by '#fsedit' in the URL. It is session/
-  // navigation scoped, so it can never get stuck "on" for a user. Any legacy
-  // persistent flag from earlier builds is cleared here so testers who set it
-  // aren't pinned in edit mode forever.
+  // EDIT mode is triggered by '#fsedit' in the URL. Intacct usually renders
+  // the form inside an iframe (where this script runs), so the iframe's own
+  // location.href has no #fsedit -- the hash lives on the TOP browser URL.
+  // We therefore check this document's URL, the top/parent window URL, and an
+  // explicit flag the loader can pass in. URL-scoped, never sticky; any legacy
+  // localStorage flag is cleared so it can't pin the selector on.
   try { localStorage.removeItem("wfwi_fs_edit"); } catch (e) {}
-  var EDIT = /(^|[#&?])fsedit(=1)?($|[#&])/i.test(location.href);
+  function hasEditToken(href) { return /(^|[#&?])fsedit(=1)?($|[#&])/i.test(String(href || "")); }
+  var EDIT = (CFG && CFG.edit === true) || hasEditToken(location.href);
+  try { if (!EDIT && window.top && window.top.location) EDIT = hasEditToken(window.top.location.href); } catch (e) {}
+  try { if (!EDIT && window.parent && window.parent !== window && window.parent.location) EDIT = hasEditToken(window.parent.location.href); } catch (e) {}
 
   // ---------------------------------------------------------------------
   // Small helpers
@@ -345,10 +350,10 @@
           return !f || (it.label || "").toLowerCase().indexOf(f) !== -1;
         });
         if (!shown.length) return;
-        var h = document.createElement("div");
-        h.style.cssText = "margin:10px 0 4px;font-weight:bold;color:#333;border-top:1px solid #eee;padding-top:6px";
-        h.textContent = title;
-        list.appendChild(h);
+        var hh = document.createElement("div");
+        hh.style.cssText = "margin:10px 0 4px;font-weight:bold;color:#333;border-top:1px solid #eee;padding-top:6px";
+        hh.textContent = title;
+        list.appendChild(hh);
         shown.forEach(function (it) {
           rendered.push(it);
           var row = document.createElement("label");

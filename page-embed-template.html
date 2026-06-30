@@ -1,17 +1,17 @@
 <!-- =====================================================================
      WFWI Sage Intacct - Field Manager : PER-PAGE EMBED
      =====================================================================
-     Paste ONE of the blocks below into the page (Intacct page editor /
-     custom HTML element). The loader is identical on every page; only the
-     config differs. All behaviour lives in the hosted field-manager.js, so
-     bug fixes/improvements ship by updating that one file - never re-paste.
+     Paste BLOCK A into the page (Intacct page editor / custom HTML element).
+     The loader is identical on every page; only the config differs. All
+     behaviour lives in the hosted field-manager.js, so bug fixes/improvements
+     ship by updating that one file - never re-paste.
 
      HOW TO SET UP A NEW PAGE
      1. Paste BLOCK A as-is (empty config) and save the page.
      2. Open the page and add  #fsedit  to the end of the URL, then reload.
         The "FIELDS" tab appears on the right. Tick what to hide.
      3. Click "Copy config" -> it copies a filled-in  window.WFWI_FS  block.
-     4. Replace the empty config in BLOCK A with the copied one, save.
+     4. Replace the placeholder config INSIDE Block A with the copied one.
      5. Remove  #fsedit  from the URL / reload as a normal user to verify.
      ===================================================================== -->
 
@@ -37,7 +37,11 @@
   (function () {
     // jsDelivr gives versioned, CDN-cached, integrity-friendly delivery.
     // Pin a tag/commit for production; use @main only while testing.
-    var SRC = "https://cdn.jsdelivr.net/gh/WfWI-IT/Sage-Intacct@v0.4.1/field-manager.js";
+    var SRC = "https://cdn.jsdelivr.net/gh/WfWI-IT/Sage-Intacct@v0.4.2/field-manager.js";
+
+    // If #fsedit is on the (top) page URL, flag edit mode so it survives being
+    // carried into the iframe where Intacct renders the form.
+    try { window.WFWI_FS = window.WFWI_FS || {}; if (/(^|[#&?])fsedit(=1)?($|[#&])/i.test(location.href)) window.WFWI_FS.edit = true; } catch (e) {}
 
     function hasForm(d) {
       try {
