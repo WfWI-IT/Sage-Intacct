@@ -1,19 +1,46 @@
+/* =====================================================================
+ * WFWI Sage Intacct - Field Manager (unified)
+ * ---------------------------------------------------------------------
+ * ONE hosted file does both jobs:
+ *   - EDIT mode  -> shows the Field Selector panel so an admin can pick
+ *                   what to hide and copy a compact config block.
+ *   - RUNTIME    -> reads the per-page config and hides those items for
+ *                   all users. No generated logic-script to paste.
+ *
+ * Per page you only ever paste a tiny config + this loader (see
+ * page-embed-template.html). All logic lives here, so fixing a bug or
+ * improving behaviour = update THIS file once; every page benefits.
+ *
+ * To edit a live page: append  #fsedit  to the URL and reload. The panel
+ * appears only when #fsedit is present, so end users never see it.
+ * ===================================================================== */
 ;(function () {
   "use strict";
 
-  var VERSION = "0.4.0";
+  var VERSION = "0.4.1";
 
+  // ---- Config (set by the per-page embed; safe defaults if absent) ----
   var CFG = (window.WFWI_FS && typeof window.WFWI_FS === "object") ? window.WFWI_FS : {};
   var PAGE_ID   = CFG.pageId || location.pathname.replace(/[^a-z0-9]/gi, "_");
   var HIDE_LIST = Array.isArray(CFG.hide) ? CFG.hide : [];
   var HIDE_SET  = {};
   for (var h = 0; h < HIDE_LIST.length; h++) HIDE_SET[HIDE_LIST[h]] = true;
   var HIDE_EMPTY = CFG.hideEmpty === true;
+  // hideEmpty is dangerous in edit forms (it hides blank inputs the user
+  // must fill). Default: only apply hideEmpty when the page is read-only,
+  // unless the config explicitly forces it.
   var HIDE_EMPTY_FORCE = CFG.hideEmptyInEditMode === true;
 
+  // EDIT mode is triggered ONLY by '#fsedit' in the URL. It is session/
+  // navigation scoped, so it can never get stuck "on" for a user. Any legacy
+  // persistent flag from earlier builds is cleared here so testers who set it
+  // aren't pinned in edit mode forever.
+  try { localStorage.removeItem("wfwi_fs_edit"); } catch (e) {}
   var EDIT = /(^|[#&?])fsedit(=1)?($|[#&])/i.test(location.href);
-  try { if (localStorage.getItem("wfwi_fs_edit") === "1") EDIT = true; } catch (e) {}
 
+  // ---------------------------------------------------------------------
+  // Small helpers
+  // ---------------------------------------------------------------------
   function text(el) { return el ? (el.innerText || el.textContent || "").trim() : ""; }
 
   function slug(s) {
@@ -39,7 +66,11 @@
     return false;
   }
 
+  // The page Intacct draws into is sometimes an iframe. The loader injects
+  // us into the right document, so `document` here is already correct.
+  // We still expose isReadOnly() to decide on hideEmpty.
   function isReadOnly() {
+    // Heuristic: a view page has read-only spans and few editable inputs.
     var editable = document.querySelectorAll(
       "input:not([type=hidden]):not([type=submit]):not([type=button]):not([readonly]):not([disabled]), " +
       "select:not([disabled]), textarea:not([readonly]):not([disabled])"
@@ -62,9 +93,18 @@
     setTimeout(function () { waitForPage(cb, tries + 1); }, 250);
   }
 
+  // ---------------------------------------------------------------------
+  // DISCOVERY  (one code path used by BOTH edit and runtime modes)
+  // Each item gets a STABLE, human-readable `key`:
+  //   field::<tab>::<label>   table::<label>   section::<label>   tab::<label>
+  // Identity is label/tab based on purpose: Intacct element ids are often
+  // auto-generated and differ between view/edit and between releases, so we
+  // never key off element id or DOM index.
+  // ---------------------------------------------------------------------
   function tabSlugFor(el) {
     var pane = el && el.closest ? el.closest(".tab-pane, [role='tabpanel']") : null;
     if (!pane) return "";
+    // Prefer the visible nav label over the (often opaque) pane id.
     var pid = pane.id;
     if (pid) {
       var nav = document.querySelector(
@@ -78,6 +118,7 @@
   function fieldLabel(group, ctrl) {
     var lab = group.querySelector(".qxf-label, label, .control-label, [class*='label']");
     var l = text(lab);
+    // For long <select> menus, prefer an explicit label[for=...].
     if (ctrl && ctrl.id) {
       var lf = group.querySelector("label[for='" + ctrl.id + "']");
       if (lf) l = text(lf) || l;
@@ -88,7 +129,7 @@
 
   function discover() {
     var fields = [], tables = [], sections = [];
-    var seen = {};
+    var seen = {};            // key -> count, for deterministic dedupe
     var usedGroups = [];
 
     function uniqueKey(base) {
@@ -100,6 +141,7 @@
       usedGroups.push(g); return false;
     }
 
+    // ---- FIELDS -------------------------------------------------------
     var groups = document.querySelectorAll(
       ".form-group, [class*='formGroup'], [class*='field-group'], .field-wrapper"
     );
@@ -118,6 +160,7 @@
       fields.push({ key: key, label: label, tab: tslug, group: g, kind: "field" });
     }
 
+    // ---- TABLES / GRIDS (Intacct line-item grids included) ------------
     var tbls = document.querySelectorAll(
       "table.editor_grid, table.readonly_grid, table.table, table.data-table, .table-responsive table"
     );
@@ -138,12 +181,13 @@
       tables.push({ key: tkey, label: tlabel, group: (wrap && wrap !== tb) ? wrap : tb, kind: "table" });
     }
 
+    // ---- SECTIONS / PANELS (skip ones that are just a field or table) -
     var secs = document.querySelectorAll(".panel, .card, fieldset");
     for (var s = 0; s < secs.length; s++) {
       var sec = secs[s];
       if (!sec || inPanel(sec)) continue;
       if (sec.closest(".form-group") || sec.closest(".tab-pane")) continue;
-      if (sec.querySelector("table")) continue;
+      if (sec.querySelector("table")) continue; // counted as a table already
       var slabel = text(sec.querySelector(".panel-title, .card-title, legend, h3, h4"));
       if (isNoiseLabel(slabel)) continue;
       var skey = uniqueKey("section::" + slug(slabel));
@@ -154,6 +198,9 @@
              all: fields.concat(tables).concat(sections) };
   }
 
+  // ---------------------------------------------------------------------
+  // EMPTY detection (used by hideEmpty)
+  // ---------------------------------------------------------------------
   function isEmpty(group) {
     if (!group) return false;
     var cb = group.querySelector(".checkbox.one-option") || group.querySelector(".checkbox");
@@ -173,6 +220,10 @@
     return v === "";
   }
 
+  // ---------------------------------------------------------------------
+  // APPLY  (runtime hiding). Debounced + observer paused during write so
+  // our own style changes don't re-trigger discovery.
+  // ---------------------------------------------------------------------
   var observer = null;
   function withObserverPaused(fn) {
     if (observer) observer.disconnect();
@@ -191,6 +242,7 @@
           (doEmpty && it.kind === "field" &&
             it.group.classList && it.group.classList.contains("form-group") && isEmpty(it.group));
         it.group.style.display = hide ? "none" : "";
+        // Also hide the matching tab nav button if a whole pane is hidden.
         if (hide && it.group.id) {
           var nav = document.querySelector(
             ".nav-tabs a[href='#" + it.group.id + "'], a[data-target='#" + it.group.id + "'], [role='tab'][aria-controls='" + it.group.id + "']"
@@ -202,20 +254,25 @@
     });
   }
 
+  // FOUC control: when we have things to hide, dim the form until the first
+  // apply lands, with a hard safety timeout so we never leave a blank page.
   var formRoot = null, revealed = false;
   function dimPage() {
     if (EDIT || HIDE_LIST.length === 0) return;
     formRoot = document.querySelector(".tab-content, form, .panel, .card, body") || document.body;
     if (formRoot) { formRoot.style.transition = "opacity .12s"; formRoot.style.opacity = "0"; }
-    setTimeout(revealPage, 1200);
+    setTimeout(revealPage, 1200); // safety net
   }
   function revealPage() {
     if (revealed) return; revealed = true;
     if (formRoot) formRoot.style.opacity = "";
   }
 
+  // ---------------------------------------------------------------------
+  // EDIT MODE UI  (selector panel)
+  // ---------------------------------------------------------------------
   function buildSelector() {
-    var hidden = {};
+    var hidden = {};               // key -> true (working copy)
     for (var k in HIDE_SET) hidden[k] = true;
 
     var tab = document.createElement("div");
@@ -309,6 +366,7 @@
         });
       }
 
+      // Group fields by tab for readability
       var byTab = {};
       data.fields.forEach(function (it) {
         var key = it.tab || "_general";
@@ -341,6 +399,8 @@
     };
     panel.querySelector("#fs-copy").onclick = function () { showConfig(hidden, emptyBox.checked); };
 
+    // Re-discover (debounced) when Intacct mutates the DOM, but keep the
+    // list stable; only refresh underlying element references + preview.
     var timer = null;
     observer = new MutationObserver(function () {
       if (timer) clearTimeout(timer);
@@ -387,11 +447,14 @@
     } catch (e) {}
   }
 
+  // ---------------------------------------------------------------------
+  // BOOT
+  // ---------------------------------------------------------------------
   waitForPage(function () {
     if (EDIT) {
       buildSelector();
     } else {
-      if (HIDE_LIST.length === 0 && !HIDE_EMPTY) return;
+      if (HIDE_LIST.length === 0 && !HIDE_EMPTY) return; // nothing to do
       dimPage();
       var t = null;
       observer = new MutationObserver(function () {

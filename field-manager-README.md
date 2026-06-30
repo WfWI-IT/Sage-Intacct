@@ -6,7 +6,7 @@ A single embeddable script that declutters Intacct record pages by hiding select
 
 Keep **one** hosted file (`field-manager.js`) that runs in two modes, and make each page carry only a tiny **config** instead of a full generated script:
 
-- **Edit mode** – append `#fsedit` to the page URL and the Field Selector panel appears. Pick what to hide, click *Copy config*.
+- **Edit mode** – append `#fsedit` to the page URL and the Field Selector panel appears. Pick what to hide, click *Copy config*. Edit mode is URL-only and never sticky, so end users never see the panel.
 - **Runtime mode** – the page embed declares `window.WFWI_FS = { pageId, hide: [...] }`; the shared script reads it and hides those items for everyone.
 
 Why this is better than generating a per-page logic script: all the *logic* lives in one version-controlled file, so a bug fix or improvement ships to every page by updating one file. Each page only stores *data* (the list of things to hide), which is short, readable, and easy to diff. The old model baked a full copy of the hiding logic into every page, so any logic change meant regenerating and re-pasting on every page — and the selector's discovery logic and the generated script's logic had already drifted apart (see below).
@@ -19,7 +19,7 @@ Why this is better than generating a per-page logic script: all the *logic* live
 
 ## How to deploy
 
-1. Commit `field-manager.js` to the repo root and tag a release (e.g. `v0.4.0`).
+1. Commit `field-manager.js` to the repo root and tag a release (e.g. `v0.4.1`).
 2. On each page, paste **Block A** from `page-embed-template.html` with an empty `hide: []` and a `pageId`.
 3. Open the page, add `#fsedit` to the URL, reload, tick fields, click *Copy config*.
 4. Paste the copied `window.WFWI_FS` block over the placeholder, save, remove `#fsedit`, verify as a normal user.
@@ -59,13 +59,13 @@ Many Intacct record pages share a pathname and differ only by query string, so `
 **8. Flash of unhidden content (FOUC).**
 The old script applied on fixed `setTimeout`s (200 ms / 800 ms), so users saw fields appear then vanish. The rewrite dims the form container until the first apply completes, with a 1.2 s safety timeout so a page can never be left blank, and applies on first mutation rather than a fixed delay.
 
-**9. Version drift.**
-The loader requested `?v=0.3.6` while the file declared `v0.3.5`. The rewrite has a single `VERSION` constant shown in the panel and written into the copied config, and versioning is handled by the CDN tag in the loader.
+**9. Version drift / sticky edit mode.**
+The loader requested `?v=0.3.6` while the file declared `v0.3.5`. The rewrite has a single `VERSION` constant shown in the panel and written into the copied config, and versioning is handled by the CDN tag in the loader. As of v0.4.1, edit mode is triggered **only** by `#fsedit` in the URL — the earlier `localStorage` toggle could be left on during testing and pin the selector "on" for that browser, so it was removed (and any legacy flag is cleared on load).
 
 ### A note on delivery and security
 Fetching `raw.githubusercontent.com` with `cache:"no-store"` on every page load, for every user, means a live runtime dependency on GitHub with no caching and rate limits — and any code in that file runs inside users' authenticated Intacct sessions. Two recommendations:
 
-- Serve via **jsDelivr** (`https://cdn.jsdelivr.net/gh/WfWI-IT/Sage-Intacct@v0.4.0/field-manager.js`) instead of raw GitHub. It's a real CDN, versioned by tag/commit, cached, and lets the browser cache the file normally (the loader now uses `<script src>` rather than `fetch`).
+- Serve via **jsDelivr** (`https://cdn.jsdelivr.net/gh/WfWI-IT/Sage-Intacct@v0.4.1/field-manager.js`) instead of raw GitHub. It's a real CDN, versioned by tag/commit, cached, and lets the browser cache the file normally (the loader now uses `<script src>` rather than `fetch`).
 - Treat the hosted file as production code: pin a tag for production (not `@main`), require PR review on the repo, and keep the repo access tight, since whoever can edit it can run JavaScript in everyone's Intacct session.
 
 ---

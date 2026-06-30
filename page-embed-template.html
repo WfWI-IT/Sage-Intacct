@@ -37,7 +37,7 @@
   (function () {
     // jsDelivr gives versioned, CDN-cached, integrity-friendly delivery.
     // Pin a tag/commit for production; use @main only while testing.
-    var SRC = "https://cdn.jsdelivr.net/gh/WfWI-IT/Sage-Intacct@v0.4.0/field-manager.js";
+    var SRC = "https://cdn.jsdelivr.net/gh/WfWI-IT/Sage-Intacct@v0.4.1/field-manager.js";
 
     function hasForm(d) {
       try {
@@ -69,11 +69,14 @@
 </script>
 
 
-<!-- ============================ BLOCK B ============================ -->
-<!-- OPTIONAL: edit-only entry point. If you'd rather not touch the URL,
-     paste this in the console once to turn the selector on for your
-     browser only, then reload any page that has BLOCK A:
+<!-- ===================================================================
+     EDIT MODE (open the selector): add  #fsedit  to the page URL and
+     reload, e.g.  .../editor.phtml?...#fsedit . It is URL-only and never
+     sticky, so end users never see the panel. Remove #fsedit (or just
+     navigate away) to return to normal runtime mode.
 
-       localStorage.setItem('wfwi_fs_edit','1');   // turn selector ON
-       localStorage.removeItem('wfwi_fs_edit');     // turn it OFF
--->
+     IMPORTANT: paste ONLY Block A on a page. The "Copy config" button
+     gives you a  window.WFWI_FS  block - use it to REPLACE the placeholder
+     config INSIDE Block A. Do not paste it as a second, separate block, or
+     the empty Block A config will override your selections.
+     =================================================================== -->
